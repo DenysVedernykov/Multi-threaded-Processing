@@ -7,7 +7,7 @@ namespace Multi_threaded_Processing
         private readonly List<Thread> _threads = new List<Thread>();
         private readonly ConcurrentQueue<T> _queue = new ConcurrentQueue<T>();
 
-        private int _countEmptyQueue = 0;
+        private readonly Semaphore _semaphore = new Semaphore(0, 100000);
 
         public MultithreadedQueueProcessingService()
         {
@@ -16,7 +16,7 @@ namespace Multi_threaded_Processing
 
         #region -- IMultithreadedQueueProcessingService implementation --
 
-        public int ThreadCount { get; set; } = 3;
+        public int ThreadCount { get; set; } = 4;
 
         public delegate void WorkerType(T value);
 
@@ -25,6 +25,8 @@ namespace Multi_threaded_Processing
         public void AddToQueue(T value)
         {
             _queue.Enqueue(value);
+
+            _semaphore.Release();
         }
 
         public void RunThreads()
@@ -53,21 +55,11 @@ namespace Multi_threaded_Processing
         {
             T value;
 
-            while (true)
+            while (_semaphore.WaitOne())
             {
                 if (_queue.TryDequeue(out value))
                 {
-                    _countEmptyQueue = 0;
-
                     Worker(value);
-                }
-                else
-                {
-                    _countEmptyQueue++;
-
-                    var delay = _countEmptyQueue >= 20000 ? 600 : 100 + (int)(500 * _countEmptyQueue / 20000f);
-
-                    Task.Delay(delay).Wait();
                 }
             }
         }
